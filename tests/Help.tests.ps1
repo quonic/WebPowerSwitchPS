@@ -35,7 +35,7 @@ BeforeDiscovery {
     ## To test, restart session.
 }
 
-Describe "Test help for <_.Name>" -ForEach $commands {
+Describe "Test help for <$($_.Name)>" -ForEach $commands {
 
     BeforeDiscovery {
         # Get command help, parameters, and links
@@ -77,11 +77,11 @@ Describe "Test help for <_.Name>" -ForEach $commands {
         ($commandHelp.Examples.Example.Remarks | Select-Object -First 1).Text | Should -Not -BeNullOrEmpty
     }
 
-    It "Help link <_> is valid" -ForEach $helpLinks {
+    It "Help link <$_> is valid" -ForEach $helpLinks {
         (Invoke-WebRequest -Uri $_ -UseBasicParsing).StatusCode | Should -Be '200'
     }
 
-    Context "Parameter <_.Name>" -Foreach $commandParameters {
+    Context "Parameter <$($_.Name)>" -Foreach $commandParameters {
 
         BeforeAll {
             $parameter         = $_
@@ -107,10 +107,10 @@ Describe "Test help for <_.Name>" -ForEach $commands {
         }
     }
 
-    Context "Test <_> help parameter help for <commandName>" -Foreach $helpParameterNames {
+    Context "Test <$_> help parameter help for <$commandName>" -Foreach $helpParameterNames {
 
         # Shouldn't find extra parameters in help.
-        It "finds help parameter in code: <_>" {
+        It "finds help parameter in code: <$_>" {
             $_ -in $parameterNames | Should -Be $true
         }
     }
