@@ -32,7 +32,7 @@ function Get-Outlet {
     Get-Outlet -IPAddress "10.10.10.10" -Filter On, Off
 
     .EXAMPLE
-    Get-Outlet -IPAddress "10.10.10.10" -Filter Locked
+    Get-Outlet -Filter On
 
     .NOTES
     General notes
@@ -41,7 +41,8 @@ function Get-Outlet {
     [OutputType([PSObject])]
     param(
         [Parameter(Mandatory = $true)]
-        [string]
+        [Alias("Ip", "ComputerName")]
+        [string[]]
         $IPAddress,
         [Parameter()]
         [pscredential]
@@ -60,29 +61,60 @@ function Get-Outlet {
     )
 
     begin {
+        if (-not $script:WPSCache) {
+            $script:WPSCache = @{}
+        }
+        if ($home) {
+            $WebPowerSwitchRoot = Join-Path $home -ChildPath ".WebPowerSwitchPS"
+        }
     }
 
     process {
-        $Params = @{
-            Method               = "Get"
-            Uri                  = "https://$IPAddress/restapi/relay/outlets/"
-            Credential           = $Credential
-            ContentType          = "application/json"
-            SkipCertificateCheck = $true
-        }
-        $Outlets = Invoke-RestMethod @Params
+        #region Default to All Devices
+        if (-not $IPAddress) {
+            # If no -IPAddress was passed
+            if ($home -and -not $script:WPSCache.Count) {
+                # Read all .webpowerswitch.clixml files beneath your .WebPowerSwitchPS directory.
+                Get-ChildItem -Path $WebPowerSwitchRoot -ErrorAction SilentlyContinue -Filter *.webpowerswitch.clixml -Force |
+                Import-Clixml |
+                ForEach-Object {
+                    if (-not $_) { return }
+                    $wpsConnection = $_
+                    $script:WPSCache["$($wpsConnection.IPAddress)"] = $wpsConnection
+                }
 
-        if ($Name) {
-            $Outlets | Where-Object { $_.name -like $Name }
-        } elseif ($Number) {
-            $Outlets[($Number - 1)]
-        } elseif ($Filter) {
-            $Outlets | Where-Object {
-                $(if ($Filter -contains "Critical") { $_.critical }) -or
-                $(if ($Filter -contains "Locked") { $_.locked }) -or
-                $(if ($Filter -contains "On") { $_.State }) -or
-                $(if ($Filter -contains "Off") { -not $_.State }) -or
-                $(if ($Filter.Count -eq 0) { $true })
+                $IPAddress = $script:WPSCache.Keys # The keys of the device cache become the -IPAddress.
+            } elseif ($script:WPSCache.Count) {
+                $IPAddress = $script:WPSCache.Keys # The keys of the device cache become the -IPAddress.
+            }
+            if (-not $IPAddress) {
+                # If we still have no -IPAddress
+                return #  return.
+            }
+        }
+        #endregion Default to All Devices
+        $IPAddress | ForEach-Object {
+            $Params = @{
+                Method               = "Get"
+                Uri                  = "https://$_/restapi/relay/outlets/"
+                Credential           = $Credential
+                ContentType          = "application/json"
+                SkipCertificateCheck = $true
+            }
+            $Outlets = Invoke-RestMethod @Params
+
+            if ($Name) {
+                $Outlets | Where-Object { $_.name -like $Name }
+            } elseif ($Number) {
+                $Outlets[($Number - 1)]
+            } elseif ($Filter) {
+                $Outlets | Where-Object {
+                    $(if ($Filter -contains "Critical") { $_.critical }) -or
+                    $(if ($Filter -contains "Locked") { $_.locked }) -or
+                    $(if ($Filter -contains "On") { $_.State }) -or
+                    $(if ($Filter -contains "Off") { -not $_.State }) -or
+                    $(if ($Filter.Count -eq 0) { $true })
+                }
             }
         }
     }

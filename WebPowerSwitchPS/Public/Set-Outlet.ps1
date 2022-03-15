@@ -45,7 +45,8 @@ function Set-Outlet {
     [OutputType([PSObject[]])]
     param(
         [Parameter(Mandatory = $true)]
-        [string]
+        [Alias("Ip", "ComputerName")]
+        [string[]]
         $IPAddress,
         [Parameter()]
         [pscredential]
@@ -55,7 +56,7 @@ function Set-Outlet {
         $Name,
         [Parameter(Mandatory = $true, ValueFromPipelineByPropertyName, ParameterSetName = "Number")]
         [ValidateRange(1, 8)]
-        [string]
+        [int]
         $Number,
         [Parameter(ValueFromPipelineByPropertyName, ParameterSetName = "Number")]
         [Parameter(ValueFromPipelineByPropertyName, ParameterSetName = "Name")]
@@ -76,44 +77,76 @@ function Set-Outlet {
 
     begin {
         $ErrorActionPreference = 'Stop'
+        if (-not $script:WPSCache) {
+            $script:WPSCache = @{}
+        }
+        if ($home) {
+            $WebPowerSwitchRoot = Join-Path $home -ChildPath ".WebPowerSwitchPS"
+        }
     }
 
     process {
-        $Outlet = if ($Name) {
-            # Gets all outlets
-            $Outlets = Get-Outlet -IPAddress $IPAddress -Credential $Credential
-            for ($i = 0; $i -lt $Outlets.Count; $i++) {
-                # Find the first name that matches
-                if ($Outlets[$i] -like $Name) { $i; break }
-            }
-            Write-Error "Outlet with the name ($Name) was not found."
-        } elseif ($Number) {
-            $Number - 1
-        }
-        $Value = if ($On) {
-            "true"
-        } elseif ($Off) {
-            "false"
-        }
-        $Method = ""
-        $State = if ($Cycle) {
-            "cycle/"
-            $Method = "Post"
-        } else {
-            "state/"
-            $Method = "Put"
-        }
+        #region Default to All Devices
+        if (-not $IPAddress) {
+            # If no -IPAddress was passed
+            if ($home -and -not $script:WPSCache.Count) {
+                # Read all .twinkly.clixml files beneath your LightScript directory.
+                Get-ChildItem -Path $WebPowerSwitchRoot -ErrorAction SilentlyContinue -Filter *.webpowerswitch.clixml -Force |
+                Import-Clixml |
+                ForEach-Object {
+                    if (-not $_) { return }
+                    $wpsConnection = $_
+                    $script:WPSCache["$($wpsConnection.IPAddress)"] = $wpsConnection
+                }
 
-        $Params = @{
-            Method               = $Method
-            Uri                  = "https://$IPAddress/restapi/relay/outlets/$Outlet/$State"
-            Credential           = $Credential
-            ContentType          = "application/json"
-            Header               = @{ value = $Value }
-            SkipCertificateCheck = $true
+                $IPAddress = $script:WPSCache.Keys # The keys of the device cache become the -IPAddress.
+            } elseif ($script:WPSCache.Count) {
+                $IPAddress = $script:WPSCache.Keys # The keys of the device cache become the -IPAddress.
+            }
+            if (-not $IPAddress) {
+                # If we still have no -IPAddress
+                return #  return.
+            }
         }
-        if ($Cycle) { $Params.Remove($Params.Header) }
-        Invoke-RestMethod @Params
+        #endregion Default to All Devices
+
+        $IPAddress | ForEach-Object {
+            $Outlet = if ($Name) {
+                # Gets all outlets
+                $Outlets = Get-Outlet -IPAddress $_ -Credential $Credential
+                for ($i = 0; $i -lt $Outlets.Count; $i++) {
+                    # Find the first name that matches
+                    if ($Outlets[$i] -like $Name) { $i; break }
+                }
+                Write-Error "Outlet with the name ($Name) was not found."
+            } elseif ($Number) {
+                $Number - 1
+            }
+            $Value = if ($On) {
+                "true"
+            } elseif ($Off) {
+                "false"
+            }
+            $Method = ""
+            $State = if ($Cycle) {
+                "cycle/"
+                $Method = "Post"
+            } else {
+                "state/"
+                $Method = "Put"
+            }
+
+            $Params = @{
+                Method               = $Method
+                Uri                  = "https://$_/restapi/relay/outlets/$Outlet/$State"
+                Credential           = $Credential
+                ContentType          = "application/json"
+                Header               = @{ value = $Value }
+                SkipCertificateCheck = $true
+            }
+            if ($Cycle) { $Params.Remove($Params.Header) }
+            Invoke-RestMethod @Params
+        }
     }
 
     end {}
