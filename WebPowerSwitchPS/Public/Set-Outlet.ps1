@@ -41,7 +41,7 @@ function Set-Outlet {
     .NOTES
     General notes
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = "Name")]
     [OutputType([PSObject[]])]
     param(
         [Parameter(Mandatory = $true)]
