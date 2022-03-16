@@ -37,24 +37,28 @@ function Get-Outlet {
     .NOTES
     General notes
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName="Name")]
     [OutputType([PSObject])]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(ParameterSetName = "Name")]
+        [Parameter(ParameterSetName = "Number")]
+        [Parameter(ParameterSetName = "Filter")]
         [Alias("Ip", "ComputerName")]
         [string[]]
         $IPAddress,
-        [Parameter()]
+        [Parameter(ParameterSetName = "Name")]
+        [Parameter(ParameterSetName = "Number")]
+        [Parameter(ParameterSetName = "Filter")]
         [pscredential]
         $Credential = $(Get-Credential -Message "Username and Password to access $IPAddress"),
-        [Parameter(ValueFromPipelineByPropertyName, ParameterSetName = "Name")]
+        [Parameter(ParameterSetName = "Name")]
         [string]
         $Name,
-        [Parameter(ValueFromPipelineByPropertyName, ParameterSetName = "Number")]
+        [Parameter(ParameterSetName = "Number")]
         [ValidateRange(1, 8)]
         [string]
         $Number,
-        [Parameter(ValueFromPipelineByPropertyName, ParameterSetName = "Filter")]
+        [Parameter(ParameterSetName = "Filter")]
         [ValidateSet("Critical", "Locked", "On", "Off")]
         [string[]]
         $Filter
@@ -115,6 +119,8 @@ function Get-Outlet {
                     $(if ($Filter -contains "Off") { -not $_.State }) -or
                     $(if ($Filter.Count -eq 0) { $true })
                 }
+            } else{
+                $Outlets
             }
         }
     }
