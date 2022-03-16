@@ -65,7 +65,7 @@ function Get-WebPowerSwitch {
         if (-not $IPAddress) {
             # If no -IPAddress was passed
             if ($home) {
-                # Read all .twinkly.clixml files beneath your LightScript directory.
+                # Read all .webpowerswitch.clixml files beneath your .WebPowerSwitchPS directory.
                 Get-ChildItem -Path $WebPowerSwitchRoot -ErrorAction SilentlyContinue -Filter *.webpowerswitch.clixml -Force |
                 Import-Clixml |
                 ForEach-Object {
