@@ -30,7 +30,7 @@ function Get-WebPowerSwitch {
     .NOTES
     General notes
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = "All")]
     [OutputType([PSObject[]])]
     param(
         [Parameter(Mandatory = $true)]
